@@ -76,7 +76,7 @@ class FaceMetaData:
 ```
 
 
-You can see a sample output json for this dataclass below as well.
+You can see a sample output json that includes this dataclass in it as well.
 ```json
 {
     "file_name": "outputs/ronaldo/face_segment_ronaldo_0.mp4",
