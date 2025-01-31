@@ -78,22 +78,35 @@ class FaceMetaData:
 
 You can see a sample output json for this dataclass below as well.
 ```json
-[
-    {
-        "timestamp": 0.0,
-        "x": 517,
-        "y": 83,
-        "h": 69,
-        "w": 56
-    },
-    {
-        "timestamp": 0.04,
-        "x": 517,
-        "y": 81,
-        "h": 72,
-        "w": 59
-    }
-]
+{
+    "file_name": "outputs/ronaldo/face_segment_ronaldo_0.mp4",
+    "start_timestamp": 0.0,
+    "end_timestamp": 39.92,
+    "face_coordinates": [
+        {
+            "timestamp": 0.0,
+            "x": 517,
+            "y": 83,
+            "h": 69,
+            "w": 56
+        },
+        {
+            "timestamp": 0.04,
+            "x": 518,
+            "y": 80,
+            "h": 73,
+            "w": 59
+        },
+        {
+            "timestamp": 0.08,
+            "x": 516,
+            "y": 81,
+            "h": 72,
+            "w": 59
+        }
+  ]
+}
+
 ```
 
 
