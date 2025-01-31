@@ -185,6 +185,12 @@ class MtcnnPipe():
 
         # Save metadata
         with open(json_path, 'w') as json_file:
-            json.dump([md.__dict__ for md in metadata], json_file, indent=4)
+            metadata_json = {
+            "file_name": face_video_path if face_clips else full_video_path,
+            "start_timestamp": metadata[0].timestamp if metadata else 0,
+            "end_timestamp": metadata[-1].timestamp if metadata else 0,
+            "face_coordinates": [md.__dict__ for md in metadata]
+            }
+            json.dump(metadata_json, json_file, indent=4)
 
         print(f"Saved {len(frames)} frames to {full_video_path}")
