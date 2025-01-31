@@ -21,6 +21,7 @@ class MtcnnPipe():
         self.device = device
         self.last_bbox = None
         self.tracker = DeepSort(max_age=30, n_init=2, nn_budget=None)
+        self.last_bbox_used_frames = 0  # Track how many frames the last bbox is used
 
     def _get_max_score_idx(self, aligned_faces, ref_img):
         """Finds the most similar face in the frame to the reference image."""
@@ -55,16 +56,15 @@ class MtcnnPipe():
         """Detects and aligns the most relevant face in the frame."""
         aligned_faces, bboxes, ref_img, probs = self.extractor.extract_and_align(frame, ref_img)
         max_idx = self._get_max_score_idx(aligned_faces, ref_img)
-        correction = self._smoother(bboxes, probs, frame, max_idx)
-        if correction != []:
-            bboxes = np.stack(correction)
         if max_idx is not None:
             self.last_bbox = bboxes[max_idx]  # Update last detected bbox
+            self.last_bbox_used_frames = 0  # Reset counter for the last bbox
             bbox = bboxes[max_idx]
             return FaceMetaData(timestamp=timestamp, x=int(bbox[0]), y=int(bbox[1]), 
                                 w=int(bbox[2] - bbox[0]), h=int(bbox[3] - bbox[1]))
         elif self.last_bbox is not None:
-            # If face disappears, use the last known bbox
+            # If face disappears, use the last known bbox and increment the used frames counter
+            self.last_bbox_used_frames += 1
             return FaceMetaData(timestamp=timestamp, x=int(self.last_bbox[0]), y=int(self.last_bbox[1]), 
                                 w=int(self.last_bbox[2] - self.last_bbox[0]), h=int(self.last_bbox[3] - self.last_bbox[1]))
         return None
@@ -101,7 +101,7 @@ class MtcnnPipe():
 
                 detection = self._search_frame(torch.tensor(frame).cuda(), ref_img, timestamp)
 
-                if detection:
+                if detection and self.last_bbox_used_frames<frame_tol:
                     missing_face_count = 0
                     x, y, w, h = detection.x, detection.y, detection.w, detection.h
                     metadata.append(detection)
@@ -128,8 +128,10 @@ class MtcnnPipe():
                 else:
                     missing_face_count += 1
 
-                    if missing_face_count > frame_tol and recording:
-                        self._save_segment(frames, face_clips, metadata, segment_index, first_face_size)
+                    # If no face is detected for more than frame_tol frames OR last bbox used for more than frame_tol frames, save segment
+                    if missing_face_count > frame_tol or self.last_bbox_used_frames > frame_tol:
+                        # this specifically modifies it so that it cleans out the last few frame of no detection
+                        self._save_segment(frames[:-frame_tol], face_clips[:-frame_tol], metadata[:-frame_tol], segment_index, first_face_size, vid_path, ref_path)
                         frames, metadata, face_clips = [], [], []
                         first_face_size = None  # Reset for next segment
                         recording = False
@@ -139,7 +141,7 @@ class MtcnnPipe():
 
             # Save any remaining frames
             if frames:
-                self._save_segment(frames, face_clips, metadata, segment_index, first_face_size)
+                self._save_segment(frames, face_clips, metadata, segment_index, first_face_size, vid_path, ref_path)
 
         cap.release()
         if video_writer:
@@ -148,14 +150,22 @@ class MtcnnPipe():
             face_writer.release()
         cv.destroyAllWindows()
 
-    def _save_segment(self, frames, face_clips, metadata, segment_index, first_face_size):
+    def _save_segment(self, frames, face_clips, metadata, segment_index, first_face_size, vid_path, ref_path):
         """Saves the current video segment with full frame and extracted face."""
         if not frames:
             return
         
         # Save full video with bounding box
-        full_video_path = os.path.join(self.write_directory, f"full_segment_{segment_index}.mp4")
-        json_path = os.path.join(self.write_directory, f"segment_{segment_index}.json")
+        vid_name = vid_path.split('/')[-1].split('.')[0]
+        ref_face_name = ref_path.split('/')[-1].split('.')[0]
+
+        # create folder if not found
+        base_folder_path = os.path.join(self.write_directory, vid_name)
+        if not os.path.exists(base_folder_path):
+            os.makedirs(base_folder_path)
+
+        full_video_path = os.path.join(self.write_directory, f"{vid_name}/full_segment_{ref_face_name}_{segment_index}.mp4")
+        json_path = os.path.join(self.write_directory, f"{vid_name}/segment_vid_{ref_face_name}_{segment_index}.json")
 
         height, width, _ = frames[0].shape
         full_video_writer = cv.VideoWriter(full_video_path, cv.VideoWriter_fourcc(*'mp4v'), 30, (width, height))
@@ -166,7 +176,7 @@ class MtcnnPipe():
 
         # Save extracted face video
         if face_clips and first_face_size:
-            face_video_path = os.path.join(self.write_directory, f"face_segment_{segment_index}.mp4")
+            face_video_path = os.path.join(self.write_directory, f"{vid_name}/face_segment_{ref_face_name}_{segment_index}.mp4")
             face_video_writer = cv.VideoWriter(face_video_path, cv.VideoWriter_fourcc(*'mp4v'), 30, first_face_size)
             
             for face in face_clips:
@@ -178,5 +188,3 @@ class MtcnnPipe():
             json.dump([md.__dict__ for md in metadata], json_file, indent=4)
 
         print(f"Saved {len(frames)} frames to {full_video_path}")
-        print(f"Saved face extraction to {face_video_path}")
-        print(f"Saved metadata to {json_path}")

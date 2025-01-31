@@ -34,21 +34,21 @@ To run the face tracking pipeline, follow these steps:
 2. **Run the Inference Pipeline:**  
    Execute the following command:  
    ```bash
-   python run.py --vid_path /home/adithya/HSL/test/face_detect/data/vid.mp4 \
-                 --ref_path /home/adithya/HSL/test/face_detect/data/reference_face/ref2.png \
+   python run.py --vid_path data/vid.mp4 \
+                 --ref_path data/reference_face/ref2.png \
                  --max_frames 50 \
                  --frame_tol 5
    ```
 3. **(Optional) Run the DeepFace Pipeline:**  
    Execute the following command:  
    ```bash
-   python run.py --vid_path /home/adithya/HSL/test/face_detect/data/vid.mp4 \
-                 --ref_path /home/adithya/HSL/test/face_detect/data/reference_face/\
+   python run.py --vid_path data/vid.mp4 \
+                 --ref_path data/reference_face/\
                  --max_frames 50 \
                  --frame_tol 5
    ```
    Noe that for this to work, you need to go to `run.py` and uncomment the relevant chunk of code. It is also relatively untested.
-   
+
 Here's a list of CLI arguments `run.py` can accept.
 ## **Command-Line Arguments**
 
@@ -58,11 +58,66 @@ Here's a list of CLI arguments `run.py` can accept.
 | `--ref_path`    | `str`   | **Required**         | Path to the reference image database.                                      |
 | `--frame_tol`   | `int`   | `15`                 | Number of consecutive frames without detection before splitting.           |
 | `--max_frames`  | `int`   | `None` (process all) | Maximum number of frames to process.                                       |
+## **Output Formats**
+All outputs should be found in the `outputs` folder. The filename 
+## **Face Bounding Box Dataclass Format**
+I also use a dataclass to structure the output format for the metadata. This is not necessarily REQUIRED, but for potential future API support, dataclasses make downstream development more consistent.
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class FaceMetaData:
+    timestamp:float = None
+    x:int = None
+    y:int = None
+    h:int = None
+    w:int = None
+```
+
+
+You can see a sample output json for this dataclass below as well.
+```json
+[
+    {
+        "timestamp": 0.0,
+        "x": 517,
+        "y": 83,
+        "h": 69,
+        "w": 56
+    },
+    {
+        "timestamp": 0.04,
+        "x": 517,
+        "y": 81,
+        "h": 72,
+        "w": 59
+    }
+]
+```
 
 
 # **Results**
+The results shown below include smoothing. For some extra comparisons you can look at the `Adding Smoothing` section below.
 
+For a more concrete look at the results shown below, please refer to the `outputs/` folder. In there, I've included 2 sample videos
 
+## Simple Video with No Clipping
+
+<table>
+  <tr>
+    <td><img src="outputs/ronaldo/full_segment.gif" alt="alt text"></td>
+    <td><img src="outputs/ronaldo/face.gif" alt="alt text" width="200"></td>
+  </tr>
+</table>
+
+## Video with Cuts
+In this example, the two cuts were generated when the camera cuts to someone else's face.
+  
+| Original Video                     | Split Video Segments                   | Split face crops                             |
+|-------------------------------------------|-------------------------------------------|-------------------------------------------|
+| ![alt text](demo_src/full_video.gif) | ![Tracked Face Video 2 Seg 0](outputs/graham/full_seg_0.gif) | ![Full Video Seg 0](outputs/graham/face_seg_0.gif) |
+| ![alt text](demo_src/full_video.gif) | ![Tracked Face Video 2 Seg 1](outputs/graham/full_seg_1.gif) | ![Full Video Seg 1](outputs/graham/face_seg_1.gif) |
 # **Adding Smoothing**
 I also added some very basic evaluations on the effect of smoothing on the capture of the face. TO do this, I used the Kalman Filter in the DeepSORT algorithm.
 
@@ -73,6 +128,8 @@ The Kalman filter estimates the state of an object (position, velocity, etc.) at
    2.	Update: When a new detection is made, the filter corrects the predicted state based on the actual measurement (the bounding box coordinates from the detection).
 
 It stabilizes it so some extent. However, more stabilization through some keypoint based approach might have provided better results.
+
+
 
 ## Full Segment Comparison  
 ### Smoothed vs. Unsmoothed  
@@ -96,7 +153,7 @@ It stabilizes it so some extent. However, more stabilization through some keypoi
 # Profiling
 To do quick profiling of the code on your system, run the following command.
 ```
-python -m cProfile -o profile.prof run.py --vid_path /home/adithya/HSL/test/face_detect/data/vid.mp4 --ref_path=/home/adithya/HSL/test/face_detect/data/reference_face/ref2.png --max_frames=50 --frame_tol=5
+python -m cProfile -o profile.prof run.py --vid_path=data/vid.mp4 --ref_path=data/reference_face/ref2.png --max_frames=50 --frame_tol=5
 ```
 Then to visualize, run,
 
@@ -111,4 +168,3 @@ Then to visualize, run,
 | **facenet-pytorch + Kalman** | 0.2   | 3-4           |
 
 Since I couldn't get the tensorflow-cudnn compatibility to work out, I ended up going with implementing a pipeline using **facenet-pytorch** (which gives a framerate of around 6-8 FPS on my 1650 RTX Laptop GPU).
-
