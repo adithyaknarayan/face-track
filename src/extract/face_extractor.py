@@ -33,21 +33,21 @@ class FaceExtractor:
     def extract_and_align(self, img:np.ndarray, ref_img:torch.tensor) -> Tuple[torch.tensor, torch.tensor]:
         bboxes, probs, landmarks = self.model.detect(img, landmarks=True) # this function annoyingly only return np arrays
         # breakpoint()
-        # if isinstance(bboxes, np.ndarray):
-        bboxes_tensor = torch.tensor(bboxes.astype('float')).to(self.device)
-        landmarks_tensor = torch.tensor(landmarks.astype('float')).to(self.device)
-        aligned_faces = self.face_aligner.align_face_pytorch(
-            img=img,
-            bboxes=bboxes_tensor,
-            landmarks = landmarks_tensor
-        ) # output shape: torch.Size([5, 3, 112, 112])
+        if isinstance(bboxes, np.ndarray):
+            bboxes_tensor = torch.tensor(bboxes.astype('float')).to(self.device)
+            landmarks_tensor = torch.tensor(landmarks.astype('float')).to(self.device)
+            aligned_faces = self.face_aligner.align_face_pytorch(
+                img=img,
+                bboxes=bboxes_tensor,
+                landmarks = landmarks_tensor
+            ) # output shape: torch.Size([5, 3, 112, 112])
 
-        #TODO: try to project facial area from original image
-        # postprocess
-        aligned_faces = self.trans(aligned_faces.permute(0,3,1,2))
-        ref_img = self.trans(ref_img.permute(2,0,1)).unsqueeze(0)
-        # breakpoint()
-        return aligned_faces, bboxes, ref_img, probs
-        # else:
-        #     return None, None, None
+            #TODO: try to project facial area from original image
+            # postprocess
+            aligned_faces = self.trans(aligned_faces.permute(0,3,1,2))
+            ref_img = self.trans(ref_img.permute(2,0,1)).unsqueeze(0)
+            # breakpoint()
+            return aligned_faces, bboxes, ref_img, probs
+        else:
+            return None, None, None, None
         
